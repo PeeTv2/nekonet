@@ -1,133 +1,351 @@
 import { useState } from 'react';
-import { Copy, Download, AlertTriangle } from 'lucide-react';
-import Papa from 'papaparse'; // For CSV export
+import { Download, AlertTriangle, Globe, Wifi, Shield, User, Phone } from 'lucide-react';
 
-export default function Dashboard({ onLogout, cookiesAccepted, darkMode, setDarkMode }) {
-  const [urlToScan, setUrlToScan] = useState('');
-  const [scanResult, setScanResult] = useState(null);
-  const [loadingScan, setLoadingScan] = useState(false);
-  // ... other states from previous versions (ipInfo, whoisInfo, etc.)
+export default function Dashboard({ onLogout, cookiesAccepted }) {
+  const [activeTab, setActiveTab] = useState('ip');
+  
+  const [ipAddress, setIpAddress] = useState('');
+  const [ipResult, setIpResult] = useState(null);
+  const [ipLoading, setIpLoading] = useState(false);
+  
+  const [domain, setDomain] = useState('');
+  const [dnsResult, setDnsResult] = useState(null);
+  const [dnsLoading, setDnsLoading] = useState(false);
+  
+  const [email, setEmail] = useState('');
+  const [breachResult, setBreachResult] = useState(null);
+  const [breachLoading, setBreachLoading] = useState(false);
+  
+  const [phone, setPhone] = useState('');
+  const [phoneResult, setPhoneResult] = useState(null);
+  
+  const [username, setUsername] = useState('');
 
-  // Ethical URL Vulnerability Scan (using urlscan.io public API - limited, ethical use only)
-  const scanUrlForVulns = async () => {
-    if (!urlToScan.trim() || !cookiesAccepted) {
-      alert('Accept cookies and enter a URL (use only on sites you own or have permission)');
-      return;
-    }
-    setLoadingScan(true);
+  const lookupIP = async () => {
+    if (!ipAddress.trim()) return;
+    setIpLoading(true);
     try {
-      const res = await fetch('https://urlscan.io/api/v1/scan/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlToScan, visibility: 'public' }),
-      });
+      const res = await fetch(`https://ipapi.co/${ipAddress}/json/`);
       const data = await res.json();
-      setScanResult(data); // Shows scan ID; user can view on urlscan.io
+      setIpResult(data);
     } catch (err) {
-      setScanResult({ error: 'Scan failed (API limits or invalid URL)' });
-    } finally {
-      setLoadingScan(false);
+      setIpResult({ error: 'Failed' });
     }
+    setIpLoading(false);
   };
 
-  // Shodan Device Search Placeholder (needs API key for real use; high-level ethical only)
-  const searchShodan = () => {
-    if (!username.trim()) return;
-    window.open(`https://www.shodan.io/search?query=${encodeURIComponent(username)}`, '_blank');
-  };
-
-  // Carbon Footprint Estimator (simple placeholder using websitecarbon.com API)
-  const estimateCarbon = async (url) => {
+  const lookupDNS = async () => {
+    if (!domain.trim()) return;
+    setDnsLoading(true);
     try {
-      const res = await fetch(`https://api.websitecarbon.com/site?url=${encodeURIComponent(url)}`);
+      const res = await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
       const data = await res.json();
-      return data;
-    } catch {
-      return { error: 'Failed to estimate' };
+      setDnsResult(data);
+    } catch (err) {
+      setDnsResult({ error: 'Failed' });
     }
+    setDnsLoading(false);
   };
 
-  // Export Results as CSV/JSON
-  const exportResults = (format) => {
-    const data = { ipInfo, whoisInfo, /* add other results */ };
-    if (format === 'json') {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'neko-results.json'; a.click();
-    } else if (format === 'csv') {
-      const csv = Papa.unparse([data]); // Flatten if needed
-      const blob = new Blob([csv], { type: 'text/csv' });
-      // ... similar download logic
+  const checkBreaches = async () => {
+    if (!email.trim()) return;
+    setBreachLoading(true);
+    try {
+      const res = await fetch(`https://haveibeenpwned.com/api/v3/breachedaccount/${email}`, {
+        headers: { 'User-Agent': 'NekoNet-OSINT' }
+      });
+      if (res.status === 404) {
+        setBreachResult({ safe: true });
+      } else {
+        const data = await res.json();
+        setBreachResult({ safe: false, breaches: data });
+      }
+    } catch (err) {
+      setBreachResult({ error: 'API limit or network error' });
     }
+    setBreachLoading(false);
+  };
+
+  const searchUsername = () => {
+    if (!username.trim()) return;
+    window.open(`https://github.com/${username}`, '_blank');
+    window.open(`https://twitter.com/${username}`, '_blank');
+    window.open(`https://instagram.com/${username}`, '_blank');
+    window.open(`https://reddit.com/user/${username}`, '_blank');
+  };
+
+  const analyzePhone = () => {
+    if (!phone.trim()) return;
+    const cleaned = phone.replace(/\D/g, '');
+    const country = cleaned.startsWith('1') ? 'US/Canada' : 
+                    cleaned.startsWith('44') ? 'UK' :
+                    cleaned.startsWith('91') ? 'India' : 'Unknown';
+    setPhoneResult({ number: phone, digits: cleaned.length, country });
+  };
+
+  const exportData = () => {
+    const data = { ipResult, dnsResult, breachResult, phoneResult };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'neko-export.json';
+    a.click();
   };
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'dark bg-black' : 'bg-gray-100 text-black'}`}>
-      <div className="container">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">NekoNet Pro Dashboard</h1>
-          <button onClick={() => setDarkMode(!darkMode)} className="p-2 bg-gray-700 rounded">
-            {darkMode ? 'Light' : 'Dark'} Mode
-          </button>
+    <div className="min-h-screen bg-black text-white">
+      <div className="max-w-6xl mx-auto p-6">
+        
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <img src="/logo.png" alt="Logo" className="w-16 h-16" />
+            <h1 className="text-2xl font-bold">NekoNet Pro</h1>
+          </div>
+          <div className="flex gap-4">
+            <button 
+              onClick={exportData}
+              className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+            >
+              <Download size={16} className="inline mr-2" /> Export
+            </button>
+            <button 
+              onClick={onLogout}
+              className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
-        {/* New: Privacy Guide Section */}
-        <div className="tool-box">
-          <h2>Pro Privacy Features</h2>
-          <p className="mb-4">For TOR: Access this site via Tor Browser for anonymity. No built-in TOR (client-side limit).</p>
-          <p>For IP Hiding: Use a VPN/TOR on your device. App proxies API calls internally (hides backend IPs).</p>
+        <div className="bg-gray-900 border border-gray-700 p-4 rounded mb-6">
+          <p className="text-sm text-gray-300">
+            <AlertTriangle size={16} className="inline mr-2" />
+            Ethical use only. Use on your own systems or with permission.
+          </p>
         </div>
 
-        {/* New: Ethical Vuln Scanner */}
-        <div className="tool-box">
-          <h2>Ethical Website Vuln Scanner</h2>
-          <p className="text-yellow-400 flex items-center mb-2"><AlertTriangle className="mr-2" /> Use only on your sites or with owner consent. Ethical only!</p>
-          <input
-            type="url"
-            placeholder="https://example.com"
-            value={urlToScan}
-            onChange={(e) => setUrlToScan(e.target.value)}
-            className="w-full mb-4 p-2 bg-gray-800 border border-gray-600 rounded"
-          />
-          <button onClick={scanUrlForVulns} disabled={loadingScan} className="bg-red-600 p-2 rounded">
-            {loadingScan ? 'Scanning...' : 'Scan URL'}
-          </button>
-          {scanResult && (
-            <pre className="mt-4 p-4 bg-black rounded overflow-auto">
-              {JSON.stringify(scanResult, null, 2)}
-            </pre>
+        <div className="flex gap-2 mb-6 overflow-x-auto">
+          {[
+            { id: 'ip', icon: Globe, label: 'IP Lookup' },
+            { id: 'dns', icon: Wifi, label: 'DNS' },
+            { id: 'breach', icon: Shield, label: 'Breach' },
+            { id: 'username', icon: User, label: 'Username' },
+            { id: 'phone', icon: Phone, label: 'Phone' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded ${
+                activeTab === tab.id 
+                  ? 'bg-white text-black' 
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              <tab.icon size={16} className="inline mr-2" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded p-6 min-h-96">
+          {activeTab === 'ip' && (
+            <div>
+              <h2 className="text-xl font-bold mb-4">IP Geolocation</h2>
+              <input
+                type="text"
+                placeholder="Enter IP (e.g., 8.8.8.8)"
+                value={ipAddress}
+                onChange={(e) => setIpAddress(e.target.value)}
+                className="w-full p-3 bg-gray-800 border border-gray-700 rounded mb-4 text-white"
+                onKeyPress={(e) => e.key === 'Enter' && lookupIP()}
+              />
+              <button
+                onClick={lookupIP}
+                disabled={ipLoading}
+                className="bg-white text-black px-6 py-3 rounded hover:bg-gray-300"
+              >
+                {ipLoading ? 'Loading...' : 'Lookup'}
+              </button>
+
+              {ipResult && (
+                <div className="mt-6 bg-gray-800 p-4 rounded">
+                  {ipResult.error ? (
+                    <p className="text-gray-300">{ipResult.error}</p>
+                  ) : (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">IP</span>
+                        <span className="text-white">{ipResult.ip}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Country</span>
+                        <span className="text-white">{ipResult.country_name}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">City</span>
+                        <span className="text-white">{ipResult.city}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">ISP</span>
+                        <span className="text-white">{ipResult.org}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Coordinates</span>
+                        <span className="text-white">{ipResult.latitude}, {ipResult.longitude}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
-          <small>Uses urlscan.io (free, limited). Check results on their site for vuln details.</small>
-        </div>
 
-        {/* New: Shodan Integration */}
-        <div className="tool-box">
-          <h2>Shodan Device/OSINT Search</h2>
-          <input
-            type="text"
-            placeholder="IP or query (e.g., port:80)"
-            value={username} // Reuse state for simplicity
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <button onClick={searchShodan}>Search Shodan</button>
-          <small>Opens Shodan (ethical use: no unauthorized scanning).</small>
-        </div>
+          {activeTab === 'dns' && (
+            <div>
+              <h2 className="text-xl font-bold mb-4">DNS Resolution</h2>
+              <input
+                type="text"
+                placeholder="Enter domain (e.g., google.com)"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                className="w-full p-3 bg-gray-800 border border-gray-700 rounded mb-4 text-white"
+                onKeyPress={(e) => e.key === 'Enter' && lookupDNS()}
+              />
+              <button
+                onClick={lookupDNS}
+                disabled={dnsLoading}
+                className="bg-white text-black px-6 py-3 rounded hover:bg-gray-300"
+              >
+                {dnsLoading ? 'Loading...' : 'Resolve'}
+              </button>
 
-        {/* Add Carbon Estimator */}
-        <div className="tool-box">
-          <h2>Website Carbon Footprint</h2>
-          {/* Similar input/button as above, call estimateCarbon */}
-        </div>
+              {dnsResult && (
+                <div className="mt-6 bg-gray-800 p-4 rounded">
+                  {dnsResult.error ? (
+                    <p className="text-gray-300">{dnsResult.error}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {dnsResult.Answer?.map((record, i) => (
+                        <div key={i} className="p-3 bg-gray-700 rounded text-sm">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-gray-400">Type</span>
+                            <span className="text-white">{record.type}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Address</span>
+                            <span className="text-white">{record.data}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* Existing Tools + Export */}
-        {/* ... IP Geo, WHOIS, Breach Check, etc. from previous code */}
-        <div className="flex gap-4 mt-6">
-          <button onClick={() => exportResults('json')} className="bg-green-600 p-2 rounded flex-1"><Download /> JSON</button>
-          <button onClick={() => exportResults('csv')} className="bg-blue-600 p-2 rounded flex-1"><Download /> CSV</button>
-        </div>
+          {activeTab === 'breach' && (
+            <div>
+              <h2 className="text-xl font-bold mb-4">Data Breach Check</h2>
+              <input
+                type="email"
+                placeholder="Enter email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-3 bg-gray-800 border border-gray-700 rounded mb-4 text-white"
+                onKeyPress={(e) => e.key === 'Enter' && checkBreaches()}
+              />
+              <button
+                onClick={checkBreaches}
+                disabled={breachLoading}
+                className="bg-white text-black px-6 py-3 rounded hover:bg-gray-300"
+              >
+                {breachLoading ? 'Checking...' : 'Check'}
+              </button>
 
-        <button onClick={onLogout} className="mt-8 bg-red-600 p-4 w-full rounded">Logout</button>
+              {breachResult && (
+                <div className="mt-6 bg-gray-800 p-4 rounded">
+                  {breachResult.error ? (
+                    <p className="text-gray-300">{breachResult.error}</p>
+                  ) : breachResult.safe ? (
+                    <p className="text-white">No breaches found</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-white font-bold mb-3">
+                        Found in {breachResult.breaches?.length} breaches
+                      </p>
+                      {breachResult.breaches?.map((breach, i) => (
+                        <div key={i} className="p-3 bg-gray-700 rounded text-sm">
+                          <p className="text-white font-bold">{breach.Name}</p>
+                          <p className="text-gray-400">{breach.Domain}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'username' && (
+            <div>
+              <h2 className="text-xl font-bold mb-4">Username Search</h2>
+              <input
+                type="text"
+                placeholder="Enter username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full p-3 bg-gray-800 border border-gray-700 rounded mb-4 text-white"
+              />
+              <button
+                onClick={searchUsername}
+                className="bg-white text-black px-6 py-3 rounded hover:bg-gray-300"
+              >
+                Search Platforms
+              </button>
+              <p className="text-sm text-gray-400 mt-4">
+                Opens GitHub, Twitter, Instagram, Reddit
+              </p>
+            </div>
+          )}
+
+          {activeTab === 'phone' && (
+            <div>
+              <h2 className="text-xl font-bold mb-4">Phone Analysis</h2>
+              <input
+                type="text"
+                placeholder="Enter phone number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full p-3 bg-gray-800 border border-gray-700 rounded mb-4 text-white"
+              />
+              <button
+                onClick={analyzePhone}
+                className="bg-white text-black px-6 py-3 rounded hover:bg-gray-300"
+              >
+                Analyze
+              </button>
+
+              {phoneResult && (
+                <div className="mt-6 bg-gray-800 p-4 rounded text-sm">
+                  <div className="flex justify-between border-b border-gray-700 pb-2 mb-2">
+                    <span className="text-gray-400">Number</span>
+                    <span className="text-white">{phoneResult.number}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-700 pb-2 mb-2">
+                    <span className="text-gray-400">Digits</span>
+                    <span className="text-white">{phoneResult.digits}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Country</span>
+                    <span className="text-white">{phoneResult.country}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
