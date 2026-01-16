@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
 import Restricted from './components/Restricted'
-import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import CookieBanner from './components/CookieBanner'
 
-const INVITE_CODE = 'secretneko2026'   // ← CHANGE THIS
-const PASSWORD = 'nekoadmin123'         // ← CHANGE THIS
+const INVITE_CODE = 'secretneko2026'  // Change this to your invite code
 
 function App() {
-  const [stage, setStage] = useState('checking') // checking → restricted → login → dashboard
+  const [stage, setStage] = useState('checking')
   const [cookiesAccepted, setCookiesAccepted] = useState(null)
 
   useEffect(() => {
@@ -17,46 +15,34 @@ function App() {
 
     if (invite !== INVITE_CODE) {
       setStage('restricted')
-      return
+    } else {
+      setStage('dashboard')
     }
-
-    const isLoggedIn = localStorage.getItem('nekoAuth') === 'true'
-    setStage(isLoggedIn ? 'dashboard' : 'login')
-
-    const consent = localStorage.getItem('cookieConsent')
-    if (consent === 'accepted') setCookiesAccepted(true)
-    else if (consent === 'rejected') setCookiesAccepted(false)
-    else setCookiesAccepted(null)
   }, [])
 
-  const handleLoginSuccess = () => {
-    localStorage.setItem('nekoAuth', 'true')
-    setStage('dashboard')
-  }
-
   const handleLogout = () => {
-    localStorage.removeItem('nekoAuth')
-    setStage('login')
+    window.location.href = window.location.origin
   }
 
   const acceptCookies = () => {
-    localStorage.setItem('cookieConsent', 'accepted')
     setCookiesAccepted(true)
   }
 
   const rejectCookies = () => {
-    localStorage.setItem('cookieConsent', 'rejected')
     setCookiesAccepted(false)
   }
 
   if (stage === 'checking') {
-    return <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>Checking access...</div>
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white/60">Verifying access...</div>
+      </div>
+    )
   }
 
   return (
     <>
       {stage === 'restricted' && <Restricted />}
-      {stage === 'login' && <Login onSuccess={handleLoginSuccess} />}
       {stage === 'dashboard' && (
         <Dashboard onLogout={handleLogout} cookiesAccepted={cookiesAccepted} />
       )}

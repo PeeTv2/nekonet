@@ -1,327 +1,233 @@
-// Dashboard.jsx - Expanded version (~800 lines target with features)
 import { useState, useEffect } from 'react';
+import AIChat from './AIChat';
+import { Bot, MessageSquare } from 'lucide-react';
+
 import { 
   Download, AlertTriangle, Globe, Wifi, Shield, User, Phone, Database, 
-  Terminal, Mail, Webcam, Image as ImageIcon, ShieldAlert, Scan, Link,
-  Server, MailSearch, GlobeLock, Activity, FileSearch, Settings, History,
-  Star, Moon, Sun, LogOut, Info, Search, Bell, ChevronDown, ChevronUp
+  Terminal, Webcam, ShieldAlert, Scan, Link, Server, MailSearch, 
+  GlobeLock, Activity, FileSearch, Settings, LogOut, Search, ExternalLink,
+  ArrowRight, Menu, X
 } from 'lucide-react';
 
-// ──────────────────────────────────────────────────────────────
-// CONFIG & TABS
-// ──────────────────────────────────────────────────────────────
-const tabs = [
-  { id: 'ip', icon: Globe, label: 'IP Lookup', desc: 'Geolocation & ISP info' },
-  { id: 'dns', icon: Wifi, label: 'DNS Resolve', desc: 'A records & more' },
-  { id: 'breach', icon: Shield, label: 'Breach Check', desc: 'HIBP lookup' },
-  { id: 'username', icon: User, label: 'Sherlock', desc: 'Multi-platform username search' },
-  { id: 'phone', icon: Phone, label: 'Phone Analyzer', desc: 'Basic carrier/country guess' },
-  { id: 'whois', icon: Database, label: 'WHOIS', desc: 'Domain registration info' },
-  { id: 'dorks', icon: Terminal, label: 'Google Dorks', desc: 'Advanced search helper' },
-  { id: 'shodan', icon: Webcam, label: 'Shodan', desc: 'Internet-connected devices' },
-  { id: 'abuseip', icon: ShieldAlert, label: 'AbuseIPDB', desc: 'IP reputation check' },
-  { id: 'virustotal', icon: Scan, label: 'VirusTotal', desc: 'URL/File scanner' },
-  { id: 'urlscan', icon: Link, label: 'urlscan.io', desc: 'Website scan reports' },
-  { id: 'censys', icon: Server, label: 'Censys', desc: 'Internet-wide asset search' },
-  { id: 'mxtoolbox', icon: MailSearch, label: 'MXToolbox', desc: 'Email/DNS diagnostics' },
-  { id: 'ssllabs', icon: GlobeLock, label: 'SSL Labs', desc: 'TLS/SSL configuration test' },
-  { id: 'otx', icon: Activity, label: 'AlienVault OTX', desc: 'Threat intelligence pulses' },
-  { id: 'osintframework', icon: FileSearch, label: 'OSINT Framework', desc: 'Tool directory' },
-  { id: 'nmap', icon: Terminal, label: 'Nmap Docs', desc: 'Network scanner reference' },
-  { id: 'metasploit', icon: ShieldAlert, label: 'Metasploit Info', desc: 'Penetration testing resources' },
+const tools = [
+  { id: 'ip', icon: Globe, label: 'IP Intelligence', url: 'https://ipinfo.io/', desc: 'Advanced IP geolocation & analysis' },
+  { id: 'dns', icon: Wifi, label: 'DNS Analyzer', url: 'https://dns.google/', desc: 'DNS records & resolution' },
+  { id: 'breach', icon: Shield, label: 'Breach Database', url: 'https://haveibeenpwned.com/', desc: 'Check compromised accounts' },
+  { id: 'shodan', icon: Webcam, label: 'Shodan', url: 'https://www.shodan.io/', desc: 'IoT & device search engine' },
+  { id: 'virustotal', icon: Scan, label: 'VirusTotal', url: 'https://www.virustotal.com/', desc: 'Multi-scanner analysis' },
+  { id: 'urlscan', icon: Link, label: 'URLScan', url: 'https://urlscan.io/', desc: 'Website security scanner' },
+  { id: 'censys', icon: Server, label: 'Censys', url: 'https://search.censys.io/', desc: 'Internet asset discovery' },
+  { id: 'whois', icon: Database, label: 'WHOIS Lookup', url: 'https://who.is/', desc: 'Domain registration data' },
+  { id: 'mxtoolbox', icon: MailSearch, label: 'MXToolbox', url: 'https://mxtoolbox.com/', desc: 'Email server diagnostics' },
+  { id: 'ssllabs', icon: GlobeLock, label: 'SSL Labs', url: 'https://www.ssllabs.com/ssltest/', desc: 'SSL/TLS testing' },
+  { id: 'otx', icon: Activity, label: 'AlienVault OTX', url: 'https://otx.alienvault.com/', desc: 'Threat intelligence platform' },
+  { id: 'osint', icon: FileSearch, label: 'OSINT Framework', url: 'https://osintframework.com/', desc: 'OSINT tools directory' },
 ];
 
-const THEMES = {
-  dark: { bg: 'from-black via-gray-950 to-black', text: 'text-white', card: 'bg-gray-900/40 border-gray-800' },
-  neon: { bg: 'from-purple-950 via-indigo-950 to-black', text: 'text-purple-200', card: 'bg-black/60 border-purple-800/50 shadow-purple-900/30' },
-};
-
 export default function Dashboard({ onLogout, cookiesAccepted }) {
-  const [activeTab, setActiveTab] = useState('ip');
-  const [inputs, setInputs] = useState({});
-  const [results, setResults] = useState({});
-  const [loading, setLoading] = useState({});
-  const [history, setHistory] = useState([]);           // New: search history
-  const [favorites, setFavorites] = useState([]);       // New: favorite tabs
-  const [theme, setTheme] = useState('dark');           // New: theme switcher
-  const [showSettings, setShowSettings] = useState(false);
-  const [apiKeys, setApiKeys] = useState({});           // New: future API key storage
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [aiChatOpen, setAiChatOpen] = useState(false);
 
-  // ──────────────────────────────────────────────────────────────
-  // PERSISTENCE
-  // ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const saved = localStorage.getItem('neko-favorites');
-    if (saved) setFavorites(JSON.parse(saved));
-  }, []);
+  const filteredTools = tools.filter(tool => 
+    (selectedCategory === 'all' || tool.id === selectedCategory) &&
+    (tool.label.toLowerCase().includes(searchQuery.toLowerCase()) || 
+     tool.desc.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
-  useEffect(() => {
-    localStorage.setItem('neko-favorites', JSON.stringify(favorites));
-  }, [favorites]);
-
-  // ──────────────────────────────────────────────────────────────
-  // CORE ACTION HANDLER
-  // ──────────────────────────────────────────────────────────────
-  const runAction = async (tabId) => {
-    const value = (inputs[tabId] || '').trim();
-    if (!value) return;
-
-    setLoading(prev => ({ ...prev, [tabId]: true }));
-
-    const timestamp = new Date().toLocaleString();
-    let result = null;
-
-    try {
-      switch (tabId) {
-        // ── Existing tools (shortened for brevity) ──
-        case 'ip':
-          const ipRes = await fetch(`https://ipapi.co/${value}/json/`);
-          result = await ipRes.json();
-          break;
-        case 'dns':
-          const dnsRes = await fetch(`https://dns.google/resolve?name=${value}&type=A`);
-          result = await dnsRes.json();
-          break;
-        case 'breach':
-          const breachRes = await fetch(`https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(value)}`, {
-            headers: { 'User-Agent': 'NekoNet-OSINT' }
-          });
-          if (breachRes.status === 404) result = { safe: true };
-          else if (breachRes.ok) result = { safe: false, breaches: await breachRes.json() };
-          else result = { error: 'Rate limit or API error' };
-          break;
-        case 'username':
-          const sites = ['github.com','twitter.com','instagram.com','reddit.com/user','tiktok.com/@','linkedin.com/in','facebook.com','twitch.tv','steamcommunity.com/id','youtube.com/@','medium.com/@'];
-          sites.forEach(s => window.open(`https://${s}/${value}`, '_blank'));
-          result = { message: 'Opened 11 profiles in new tabs' };
-          break;
-        case 'phone':
-          const cleaned = value.replace(/\D/g, '');
-          let country = 'Unknown';
-          if (cleaned.startsWith('1')) country = 'US/Canada';
-          else if (cleaned.startsWith('44')) country = 'UK';
-          else if (cleaned.startsWith('91')) country = 'India';
-          result = { number: value, digits: cleaned.length, country };
-          break;
-        // ... (all other cases like whois, shodan, abuseip, virustotal, etc. remain the same)
-        case 'osintframework':
-          window.open('https://osintframework.com/', '_blank');
-          result = { message: 'OSINT Framework directory opened' };
-          break;
-        case 'nmap':
-          window.open('https://nmap.org/nsedoc/', '_blank');
-          result = { message: 'Nmap documentation opened (ethical use only)' };
-          break;
-        default:
-          result = { error: 'Tool not implemented yet' };
-      }
-
-      setResults(prev => ({ ...prev, [tabId]: result }));
-      
-      // Add to history
-      setHistory(prev => [{
-        tab: tabId,
-        input: value,
-        timestamp,
-        success: !result?.error
-      }, ...prev.slice(0, 49)]); // keep last 50
-    } catch (err) {
-      setResults(prev => ({ ...prev, [tabId]: { error: 'Network error or rate limit' } }));
-    }
-
-    setLoading(prev => ({ ...prev, [tabId]: false }));
-  };
-
-  const toggleFavorite = (tabId) => {
-    setFavorites(prev => 
-      prev.includes(tabId)
-        ? prev.filter(id => id !== tabId)
-        : [...prev, tabId]
-    );
-  };
-
-  const exportResults = () => {
-    const data = { results, history, favorites, timestamp: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `neko-export-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const currentTab = tabs.find(t => t.id === activeTab);
-  const currentTheme = THEMES[theme] || THEMES.dark;
+  const categories = [
+    { id: 'all', label: 'All Tools' },
+    { id: 'network', label: 'Network', items: ['ip', 'dns', 'whois'] },
+    { id: 'security', label: 'Security', items: ['shodan', 'virustotal', 'urlscan', 'ssllabs'] },
+    { id: 'intelligence', label: 'Intelligence', items: ['breach', 'otx', 'osint'] },
+  ];
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${currentTheme.bg} ${currentTheme.text} p-6 transition-colors duration-500`}>
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
-        <div className="flex items-center gap-4">
-          <img src="/logo.png" alt="NekoNet" className="w-16 h-16 object-contain" onError={e => e.target.src = 'https://via.placeholder.com/64?text=NN'} />
-          <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400">
-            NekoNet Pro
-          </h1>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <button onClick={exportResults} className="flex items-center gap-2 px-5 py-2.5 bg-gray-800/80 hover:bg-gray-700 rounded-lg border border-gray-700 transition">
-            <Download size={18} /> Export
-          </button>
-          <button onClick={() => setShowSettings(!showSettings)} className="p-2.5 bg-gray-800/80 hover:bg-gray-700 rounded-lg border border-gray-700">
-            <Settings size={20} />
-          </button>
-          <button onClick={onLogout} className="px-5 py-2.5 bg-red-900/60 hover:bg-red-800/60 text-red-200 rounded-lg border border-red-700/50 transition">
-            <LogOut size={18} className="inline mr-2" /> Logout
-          </button>
-        </div>
-      </header>
-
-      {/* Settings Panel */}
-      {showSettings && (
-        <div className="mb-8 p-6 bg-gray-900/70 border border-gray-700 rounded-xl">
-          <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Settings size={20} /> Settings
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Theme</label>
-              <select 
-                value={theme} 
-                onChange={e => setTheme(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5"
+    <div className="min-h-screen bg-black text-white">
+      {/* Top Navigation */}
+      <nav className="border-b border-white/10 bg-black/95 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-2 hover:bg-white/5 rounded-lg transition lg:hidden"
               >
-                <option value="dark">Dark (default)</option>
-                <option value="neon">Neon Purple</option>
-              </select>
+                {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white rounded flex items-center justify-center">
+                  <Globe className="text-black" size={18} />
+                </div>
+                <span className="text-xl font-bold tracking-tight">NekoNet</span>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">API Keys (future)</label>
-              <input 
-                type="text" 
-                placeholder="e.g. VirusTotal API key" 
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5"
-                disabled
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setAiChatOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg border border-white/20 transition text-sm"
+              >
+                <Bot size={16} />
+                <span className="hidden sm:inline">AI Chat</span>
+              </button>
+              <button 
+                onClick={onLogout}
+                className="flex items-center gap-2 px-4 py-2 border border-white/20 hover:bg-white/5 rounded-lg transition text-sm"
+              >
+                <LogOut size={16} />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className={`
+          fixed lg:sticky top-16 left-0 h-[calc(100vh-4rem)] w-64 bg-black border-r border-white/10 
+          transition-transform duration-300 z-40
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
+          <div className="p-6">
+            <div className="mb-6">
+              <input
+                type="text"
+                placeholder="Search tools..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-white/30 transition"
               />
-              <p className="text-xs text-gray-500 mt-1">Coming in next update</p>
+            </div>
+
+            <nav className="space-y-1">
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition ${
+                    selectedCategory === cat.id
+                      ? 'bg-white text-black'
+                      : 'text-white/70 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="mt-8 pt-6 border-t border-white/10">
+              <div className="text-xs text-white/40 space-y-2">
+                <p>© 2026 NekoNet</p>
+                <p>Professional OSINT Suite</p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        </aside>
 
-      {/* Warning & Legal */}
-      <div className="bg-amber-950/50 border border-amber-800/60 text-amber-300 p-5 rounded-xl mb-8 flex items-start gap-4">
-        <AlertTriangle size={24} className="mt-1 flex-shrink-0" />
-        <div>
-          <p className="font-semibold mb-2">Important – Ethical & Legal Notice</p>
-          <p className="text-sm">
-            This tool is for authorized security research, penetration testing with permission, and personal education only. 
-            Unauthorized access, data scraping, or any illegal activity is strictly prohibited.
-          </p>
-        </div>
-      </div>
+        {/* Main Content */}
+        <main className="flex-1 min-h-[calc(100vh-4rem)]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Warning Banner */}
+            <div className="mb-8 border border-white/20 rounded-lg p-5 bg-white/5">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={20} className="flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold mb-1">Professional Use Only</h3>
+                  <p className="text-sm text-white/60">
+                    These tools are for authorized security research, penetration testing with explicit permission, 
+                    and educational purposes only. Unauthorized access or misuse is strictly prohibited.
+                  </p>
+                </div>
+              </div>
+            </div>
 
-      {/* Quick Links / Affiliates */}
-      <div className="mb-8 p-5 bg-gray-900/50 rounded-xl border border-gray-800">
-        <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-          <Star size={18} /> Recommended & High-Traffic Resources
-        </h3>
-        <div className="flex flex-wrap gap-5 text-sm">
-          <a href="https://shodan.io" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Shodan</a>
-          <a href="https://cyble.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Cyble</a>
-          <a href="https://www.reddit.com/r/OSINT/" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">r/OSINT</a>
-          <a href="https://nordlayer.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">NordLayer VPN (aff)</a>
-        </div>
-      </div>
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl sm:text-4xl font-bold mb-2">Security Intelligence Tools</h1>
+              <p className="text-white/60">Access professional-grade OSINT and security analysis platforms</p>
+            </div>
 
-      {/* Tabs with Favorites */}
-      <div className="flex flex-wrap gap-2 mb-8 overflow-x-auto pb-2">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`group relative flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-all border flex-shrink-0 ${
-              activeTab === tab.id
-                ? 'bg-purple-700/40 border-purple-500 text-white shadow-sm'
-                : 'bg-gray-900/60 border-gray-700 text-gray-400 hover:bg-gray-800'
-            }`}
-          >
-            <tab.icon size={18} />
-            {tab.label}
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleFavorite(tab.id); }}
-              className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Star size={14} className={favorites.includes(tab.id) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-500'} />
-            </button>
-          </button>
-        ))}
-      </div>
+            {/* Tools Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredTools.map(tool => (
+                <a
+                  key={tool.id}
+                  href={tool.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group border border-white/10 rounded-lg p-6 hover:border-white/30 hover:bg-white/5 transition-all duration-300"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center group-hover:bg-white/10 transition">
+                      <tool.icon size={24} className="text-white" />
+                    </div>
+                    <ExternalLink size={18} className="text-white/40 group-hover:text-white transition" />
+                  </div>
+                  
+                  <h3 className="text-lg font-semibold mb-2 group-hover:text-white transition">
+                    {tool.label}
+                  </h3>
+                  
+                  <p className="text-sm text-white/60 mb-4">
+                    {tool.desc}
+                  </p>
 
-      {/* Main Content Area */}
-      <main className={`bg-gray-900/40 border border-gray-800 rounded-2xl p-6 md:p-8 min-h-[600px] ${currentTheme.card}`}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-purple-300">{currentTab.label}</h2>
-          <p className="text-sm text-gray-500">{currentTab.desc}</p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <input
-            type="text"
-            placeholder={`Enter target for ${currentTab.label.toLowerCase()}...`}
-            value={inputs[activeTab] || ''}
-            onChange={e => setInput(activeTab, e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && runAction(activeTab)}
-            className="flex-1 bg-gray-950 border border-gray-700 rounded-lg px-5 py-3.5 focus:border-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-600/50"
-          />
-          <button
-            onClick={() => runAction(activeTab)}
-            disabled={loading[activeTab]}
-            className="bg-purple-700 hover:bg-purple-600 px-8 py-3.5 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed min-w-[140px] flex items-center justify-center gap-2"
-          >
-            {loading[activeTab] ? (
-              <>Loading...</>
-            ) : (
-              <>Run <Search size={16} /></>
-            )}
-          </button>
-        </div>
-
-        {results[activeTab] && (
-          <div className="mt-6 bg-gray-950/70 p-6 rounded-xl border border-gray-800">
-            <pre className="text-sm text-gray-300 overflow-auto max-h-[500px] font-mono leading-relaxed whitespace-pre-wrap">
-              {JSON.stringify(results[activeTab], null, 2)}
-            </pre>
-          </div>
-        )}
-
-        {/* History Sidebar (collapsible) */}
-        {history.length > 0 && (
-          <div className="mt-10 border-t border-gray-800 pt-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <History size={18} /> Recent Searches
-            </h3>
-            <ul className="space-y-2 text-sm">
-              {history.slice(0, 10).map((item, i) => (
-                <li key={i} className="flex justify-between items-center bg-gray-900/50 p-3 rounded-lg">
-                  <span className="text-gray-400">
-                    {item.timestamp} – <strong>{tabs.find(t => t.id === item.tab)?.label}</strong>: {item.input}
-                  </span>
-                  <span className={item.success ? 'text-green-400' : 'text-red-400'}>
-                    {item.success ? 'OK' : 'Error'}
-                  </span>
-                </li>
+                  <div className="flex items-center gap-2 text-sm text-white/40 group-hover:text-white transition">
+                    <span>Open tool</span>
+                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </a>
               ))}
-            </ul>
-          </div>
-        )}
-      </main>
+            </div>
 
-      {/* Footer Info */}
-      <footer className="mt-12 text-center text-gray-600 text-sm">
-        NekoNet Pro © 2026 • Ethical OSINT & Security Research Tool • Use responsibly
-      </footer>
+            {filteredTools.length === 0 && (
+              <div className="text-center py-16 text-white/40">
+                <Search size={48} className="mx-auto mb-4 opacity-50" />
+                <p>No tools found matching your search</p>
+              </div>
+            )}
+
+            {/* Quick Links */}
+            <div className="mt-12 border-t border-white/10 pt-8">
+              <h2 className="text-xl font-semibold mb-4">Recommended Resources</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <a href="https://www.reddit.com/r/OSINT/" target="_blank" rel="noopener noreferrer" 
+                   className="border border-white/10 rounded-lg p-4 hover:border-white/30 hover:bg-white/5 transition text-sm">
+                  <div className="font-medium mb-1">r/OSINT</div>
+                  <div className="text-white/60 text-xs">Community forum</div>
+                </a>
+                <a href="https://osintframework.com/" target="_blank" rel="noopener noreferrer"
+                   className="border border-white/10 rounded-lg p-4 hover:border-white/30 hover:bg-white/5 transition text-sm">
+                  <div className="font-medium mb-1">OSINT Framework</div>
+                  <div className="text-white/60 text-xs">Tool directory</div>
+                </a>
+                <a href="https://inteltechniques.com/" target="_blank" rel="noopener noreferrer"
+                   className="border border-white/10 rounded-lg p-4 hover:border-white/30 hover:bg-white/5 transition text-sm">
+                  <div className="font-medium mb-1">IntelTechniques</div>
+                  <div className="text-white/60 text-xs">Research tools</div>
+                </a>
+                <a href="https://github.com/jivoi/awesome-osint" target="_blank" rel="noopener noreferrer"
+                   className="border border-white/10 rounded-lg p-4 hover:border-white/30 hover:bg-white/5 transition text-sm">
+                  <div className="font-medium mb-1">Awesome OSINT</div>
+                  <div className="text-white/60 text-xs">Curated list</div>
+                </a>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <AIChat isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
     </div>
   );
 }
