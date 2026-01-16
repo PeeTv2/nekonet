@@ -1,17 +1,27 @@
-import { ShieldAlert } from 'lucide-react';
+import { useState } from 'react';
+import { ShieldAlert, Globe } from 'lucide-react';
 
 export default function Restricted() {
+  const [imageError, setImageError] = useState(false);
+
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="text-center max-w-md">
-        <img
-          src="/logo.png"
-          alt="NekoNet"
-          className="w-48 h-48 mx-auto mb-8 object-contain"
-          onError={(e) => {
-            e.target.src = "https://via.placeholder.com/192x192/000/fff?text=NekoNet";
-          }}
-        />
+        {/* Logo with fallback */}
+        <div className="w-48 h-48 mx-auto mb-8 relative">
+          {!imageError ? (
+            <img
+              src="/logo.png"
+              alt="NekoNet"
+              className="w-full h-full object-contain"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <div className="w-full h-full bg-white rounded-3xl flex items-center justify-center">
+              <Globe className="text-black" size={96} />
+            </div>
+          )}
+        </div>
 
         <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">
           ACCESS RESTRICTED

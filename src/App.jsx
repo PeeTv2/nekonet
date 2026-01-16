@@ -1,57 +1,70 @@
-import { useState, useEffect } from 'react'
-import Restricted from './components/Restricted'
-import Dashboard from './components/Dashboard'
-import CookieBanner from './components/CookieBanner'
+import { useState, useEffect } from 'react';
+import Login from './Login';
+import Dashboard from './Dashboard';
+import Restricted from './Restricted';
+import CookieBanner from './CookieBanner';
+import AIBrainChat from './AIBrainChat';
 
-const INVITE_CODE = 'secretneko2026'  // Change this to your invite code
-
-function App() {
-  const [stage, setStage] = useState('checking')
-  const [cookiesAccepted, setCookiesAccepted] = useState(null)
+export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasInvite, setHasInvite] = useState(false);
+  const [cookiesAccepted, setCookiesAccepted] = useState(null);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const invite = params.get('invite')
-
-    if (invite !== INVITE_CODE) {
-      setStage('restricted')
-    } else {
-      setStage('dashboard')
+    // Check for invite code in URL
+    const params = new URLSearchParams(window.location.search);
+    const inviteCode = params.get('invite');
+    
+    if (inviteCode === 'secretneko2026') {
+      setHasInvite(true);
     }
-  }, [])
+
+    // Check cookies acceptance
+    const cookieStatus = localStorage.getItem('cookiesAccepted');
+    if (cookieStatus !== null) {
+      setCookiesAccepted(cookieStatus === 'true');
+    }
+  }, []);
+
+  const handleCookieAccept = () => {
+    localStorage.setItem('cookiesAccepted', 'true');
+    setCookiesAccepted(true);
+  };
+
+  const handleCookieReject = () => {
+    localStorage.setItem('cookiesAccepted', 'false');
+    setCookiesAccepted(false);
+  };
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+  };
 
   const handleLogout = () => {
-    window.location.href = window.location.origin
+    setIsAuthenticated(false);
+    setAiChatOpen(false);
+  };
+
+  // Show cookie banner first
+  if (cookiesAccepted === null) {
+    return <CookieBanner onAccept={handleCookieAccept} onReject={handleCookieReject} />;
   }
 
-  const acceptCookies = () => {
-    setCookiesAccepted(true)
+  // Show restricted page if no invite or cookies rejected
+  if (!hasInvite || cookiesAccepted === false) {
+    return <Restricted />;
   }
 
-  const rejectCookies = () => {
-    setCookiesAccepted(false)
-  }
-
-  if (stage === 'checking') {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white/60">Verifying access...</div>
-      </div>
-    )
+  // Show login or dashboard
+  if (!isAuthenticated) {
+    return <Login onSuccess={handleLogin} />;
   }
 
   return (
     <>
-      {stage === 'restricted' && <Restricted />}
-      {stage === 'dashboard' && (
-        <Dashboard onLogout={handleLogout} cookiesAccepted={cookiesAccepted} />
-      )}
-
-      {stage !== 'restricted' && cookiesAccepted === null && (
-        <CookieBanner onAccept={acceptCookies} onReject={rejectCookies} />
-      )}
+      <Dashboard onLogout={handleLogout} onOpenAIChat={() => setAiChatOpen(true)} />
+      <AIBrainChat isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
     </>
-  )
+  );
 }
-
-export default App

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Globe } from 'lucide-react';
 
 export default function Login({ onSuccess }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const handleSubmit = () => {
     if (password === 'nekoadmin123') {
@@ -19,14 +20,22 @@ export default function Login({ onSuccess }) {
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img 
-            src="/logo.png" 
-            alt="NekoNet Logo" 
-            className="w-28 h-28 mx-auto mb-6 object-contain"
-            onError={(e) => {
-              e.target.src = "https://via.placeholder.com/112x112/000/fff?text=NN";
-            }}
-          />
+          {/* Logo with fallback */}
+          <div className="w-28 h-28 mx-auto mb-6 relative">
+            {!imageError ? (
+              <img 
+                src="/logo.png" 
+                alt="NekoNet Logo" 
+                className="w-full h-full object-contain"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="w-full h-full bg-white rounded-2xl flex items-center justify-center">
+                <Globe className="text-black" size={56} />
+              </div>
+            )}
+          </div>
+          
           <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">NekoNet</h1>
           <p className="text-white/60">Professional OSINT Suite</p>
         </div>
@@ -76,6 +85,13 @@ export default function Login({ onSuccess }) {
               Authorized access only • All activities are logged
             </p>
           </div>
+        </div>
+
+        {/* Hint for demo */}
+        <div className="mt-4 text-center">
+          <p className="text-xs text-white/30">
+            Demo password: nekoadmin123
+          </p>
         </div>
       </div>
     </div>

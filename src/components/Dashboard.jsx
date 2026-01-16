@@ -1,43 +1,42 @@
 import { useState } from 'react';
-import AIBrainChat from './AIBrainChat';
 import { 
   Globe, Wifi, Shield, Webcam, Scan, Link, Server, Database, 
   MailSearch, GlobeLock, Activity, FileSearch, LogOut, Search, 
   ExternalLink, ArrowRight, Menu, X, Bot, AlertTriangle, Sparkles,
-  Image as ImageIcon, Loader
+  Loader
 } from 'lucide-react';
 
 const tools = [
-  { id: 'ip', icon: Globe, label: 'IP Intelligence', url: 'https://ipinfo.io/', desc: 'Advanced IP geolocation & analysis' },
-  { id: 'dns', icon: Wifi, label: 'DNS Analyzer', url: 'https://dns.google/', desc: 'DNS records & resolution' },
-  { id: 'breach', icon: Shield, label: 'Breach Database', url: 'https://haveibeenpwned.com/', desc: 'Check compromised accounts' },
-  { id: 'shodan', icon: Webcam, label: 'Shodan', url: 'https://www.shodan.io/', desc: 'IoT & device search engine' },
-  { id: 'virustotal', icon: Scan, label: 'VirusTotal', url: 'https://www.virustotal.com/', desc: 'Multi-scanner analysis' },
-  { id: 'urlscan', icon: Link, label: 'URLScan', url: 'https://urlscan.io/', desc: 'Website security scanner' },
-  { id: 'censys', icon: Server, label: 'Censys', url: 'https://search.censys.io/', desc: 'Internet asset discovery' },
-  { id: 'whois', icon: Database, label: 'WHOIS Lookup', url: 'https://who.is/', desc: 'Domain registration data' },
-  { id: 'mxtoolbox', icon: MailSearch, label: 'MXToolbox', url: 'https://mxtoolbox.com/', desc: 'Email server diagnostics' },
-  { id: 'ssllabs', icon: GlobeLock, label: 'SSL Labs', url: 'https://www.ssllabs.com/ssltest/', desc: 'SSL/TLS testing' },
-  { id: 'otx', icon: Activity, label: 'AlienVault OTX', url: 'https://otx.alienvault.com/', desc: 'Threat intelligence platform' },
-  { id: 'osint', icon: FileSearch, label: 'OSINT Framework', url: 'https://osintframework.com/', desc: 'OSINT tools directory' },
+  { id: 'ip', icon: Globe, label: 'IP Intelligence', url: 'https://ipinfo.io/', desc: 'Advanced IP geolocation & analysis', category: 'network' },
+  { id: 'dns', icon: Wifi, label: 'DNS Analyzer', url: 'https://dns.google/', desc: 'DNS records & resolution', category: 'network' },
+  { id: 'breach', icon: Shield, label: 'Breach Database', url: 'https://haveibeenpwned.com/', desc: 'Check compromised accounts', category: 'security' },
+  { id: 'shodan', icon: Webcam, label: 'Shodan', url: 'https://www.shodan.io/', desc: 'IoT & device search engine', category: 'intelligence' },
+  { id: 'virustotal', icon: Scan, label: 'VirusTotal', url: 'https://www.virustotal.com/', desc: 'Multi-scanner analysis', category: 'security' },
+  { id: 'urlscan', icon: Link, label: 'URLScan', url: 'https://urlscan.io/', desc: 'Website security scanner', category: 'security' },
+  { id: 'censys', icon: Server, label: 'Censys', url: 'https://search.censys.io/', desc: 'Internet asset discovery', category: 'intelligence' },
+  { id: 'whois', icon: Database, label: 'WHOIS Lookup', url: 'https://who.is/', desc: 'Domain registration data', category: 'network' },
+  { id: 'mxtoolbox', icon: MailSearch, label: 'MXToolbox', url: 'https://mxtoolbox.com/', desc: 'Email server diagnostics', category: 'network' },
+  { id: 'ssllabs', icon: GlobeLock, label: 'SSL Labs', url: 'https://www.ssllabs.com/ssltest/', desc: 'SSL/TLS testing', category: 'security' },
+  { id: 'otx', icon: Activity, label: 'AlienVault OTX', url: 'https://otx.alienvault.com/', desc: 'Threat intelligence platform', category: 'intelligence' },
+  { id: 'osint', icon: FileSearch, label: 'OSINT Framework', url: 'https://osintframework.com/', desc: 'OSINT tools directory', category: 'intelligence' },
 ];
 
-export default function Dashboard({ onLogout }) {
+export default function Dashboard({ onLogout, onOpenAIChat }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [aiChatOpen, setAiChatOpen] = useState(false);
   
   // Smart Search State
   const [smartSearchQuery, setSmartSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
 
-  const filteredTools = tools.filter(tool => 
-    (selectedCategory === 'all' || tool.id === selectedCategory) &&
-    (tool.label.toLowerCase().includes(searchQuery.toLowerCase()) || 
-     tool.desc.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredTools = tools.filter(tool => {
+    const matchesCategory = selectedCategory === 'all' || tool.category === selectedCategory;
+    const matchesSearch = tool.label.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         tool.desc.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   const categories = [
     { id: 'all', label: 'All Tools' },
@@ -53,27 +52,33 @@ export default function Dashboard({ onLogout }) {
     setSearchResults(null);
 
     try {
-      // Search Wikipedia
-      const wikiResponse = await fetch(
-        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(smartSearchQuery)}`
-      );
+      // Use a CORS proxy for Wikipedia
+      const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(smartSearchQuery)}`;
+      
+      const wikiResponse = await fetch(wikiUrl);
       const wikiData = await wikiResponse.json();
 
-      // Search Reddit
-      const redditResponse = await fetch(
-        `https://www.reddit.com/search.json?q=${encodeURIComponent(smartSearchQuery)}&limit=5`
-      );
-      const redditData = await redditResponse.json();
+      // Try to fetch Reddit data with error handling
+      let redditPosts = [];
+      try {
+        const redditResponse = await fetch(
+          `https://www.reddit.com/search.json?q=${encodeURIComponent(smartSearchQuery)}&limit=5`
+        );
+        const redditData = await redditResponse.json();
+        redditPosts = redditData?.data?.children || [];
+      } catch (redditError) {
+        console.log('Reddit fetch failed, continuing without Reddit results');
+      }
 
       setSearchResults({
         wikipedia: wikiData,
-        reddit: redditData?.data?.children || [],
+        reddit: redditPosts,
         query: smartSearchQuery
       });
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults({
-        error: 'Failed to fetch search results. Please try again.',
+        error: 'Failed to fetch search results. The API may be blocked by CORS policy. Try searching directly on Wikipedia or Reddit.',
         query: smartSearchQuery
       });
     } finally {
@@ -83,6 +88,7 @@ export default function Dashboard({ onLogout }) {
 
   return (
     <div className="min-h-screen bg-black text-white">
+      {/* Navigation */}
       <nav className="border-b border-white/10 bg-black/95 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -103,7 +109,7 @@ export default function Dashboard({ onLogout }) {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setAiChatOpen(true)}
+                onClick={onOpenAIChat}
                 className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg border border-white/20 transition text-sm font-medium"
               >
                 <Bot size={16} />
@@ -122,6 +128,7 @@ export default function Dashboard({ onLogout }) {
       </nav>
 
       <div className="flex">
+        {/* Sidebar */}
         <aside className={`
           fixed lg:sticky top-16 left-0 h-[calc(100vh-4rem)] w-64 bg-black border-r border-white/10 
           transition-transform duration-300 z-30
@@ -163,6 +170,7 @@ export default function Dashboard({ onLogout }) {
           </div>
         </aside>
 
+        {/* Main Content */}
         <main className="flex-1 min-h-[calc(100vh-4rem)]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Smart Search Section */}
@@ -191,12 +199,12 @@ export default function Dashboard({ onLogout }) {
                   {searching ? (
                     <>
                       <Loader size={18} className="animate-spin" />
-                      Searching...
+                      <span className="hidden sm:inline">Searching...</span>
                     </>
                   ) : (
                     <>
                       <Search size={18} />
-                      Search
+                      <span className="hidden sm:inline">Search</span>
                     </>
                   )}
                 </button>
@@ -269,13 +277,6 @@ export default function Dashboard({ onLogout }) {
                                   <span>•</span>
                                   <span>💬 {post.data.num_comments}</span>
                                 </div>
-                                {post.data.thumbnail && post.data.thumbnail.startsWith('http') && (
-                                  <img
-                                    src={post.data.thumbnail}
-                                    alt=""
-                                    className="w-20 h-20 object-cover rounded mb-2"
-                                  />
-                                )}
                                 <a
                                   href={`https://reddit.com${post.data.permalink}`}
                                   target="_blank"
@@ -315,36 +316,40 @@ export default function Dashboard({ onLogout }) {
               <p className="text-white/60">Access professional-grade OSINT and security analysis platforms</p>
             </div>
 
+            {/* Tools Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredTools.map(tool => (
-                <a
-                  key={tool.id}
-                  href={tool.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group border border-white/10 rounded-xl p-6 hover:border-white/30 hover:bg-white/5 transition-all duration-300"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center group-hover:bg-white/10 transition">
-                      <tool.icon size={24} className="text-white" />
+              {filteredTools.map(tool => {
+                const Icon = tool.icon;
+                return (
+                  <a
+                    key={tool.id}
+                    href={tool.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group border border-white/10 rounded-xl p-6 hover:border-white/30 hover:bg-white/5 transition-all duration-300"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center group-hover:bg-white/10 transition">
+                        <Icon size={24} className="text-white" />
+                      </div>
+                      <ExternalLink size={18} className="text-white/40 group-hover:text-white transition" />
                     </div>
-                    <ExternalLink size={18} className="text-white/40 group-hover:text-white transition" />
-                  </div>
-                  
-                  <h3 className="text-lg font-semibold mb-2 group-hover:text-white transition">
-                    {tool.label}
-                  </h3>
-                  
-                  <p className="text-sm text-white/60 mb-4">
-                    {tool.desc}
-                  </p>
+                    
+                    <h3 className="text-lg font-semibold mb-2 group-hover:text-white transition">
+                      {tool.label}
+                    </h3>
+                    
+                    <p className="text-sm text-white/60 mb-4">
+                      {tool.desc}
+                    </p>
 
-                  <div className="flex items-center gap-2 text-sm text-white/40 group-hover:text-white transition">
-                    <span>Open tool</span>
-                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </a>
-              ))}
+                    <div className="flex items-center gap-2 text-sm text-white/40 group-hover:text-white transition">
+                      <span>Open tool</span>
+                      <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </a>
+                );
+              })}
             </div>
 
             {filteredTools.length === 0 && (
@@ -354,6 +359,7 @@ export default function Dashboard({ onLogout }) {
               </div>
             )}
 
+            {/* Recommended Resources */}
             <div className="mt-12 border-t border-white/10 pt-8">
               <h2 className="text-xl font-semibold mb-4">Recommended Resources</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -383,14 +389,13 @@ export default function Dashboard({ onLogout }) {
         </main>
       </div>
 
+      {/* Sidebar Overlay */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
-      
-      <AIBrainChat isOpen={aiChatOpen} onClose={() => setAiChatOpen(false)} />
     </div>
   );
 }

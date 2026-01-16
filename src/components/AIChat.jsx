@@ -11,7 +11,7 @@ class SimplifiedAIBrain {
   initializeKnowledge() {
     this.knowledgeBase = {
       greetings: {
-        patterns: ['hi', 'hello', 'hey', 'greetings', 'good morning', 'good afternoon'],
+        patterns: ['hi', 'hello', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening'],
         response: `👋 Hi! I'm NOVA-SEEK, your advanced AI assistant. I can help you with:
 
 • Answering questions on any topic
@@ -24,7 +24,7 @@ What would you like to explore today?`,
         confidence: 95
       },
       capabilities: {
-        patterns: ['what can you do', 'help', 'capabilities', 'features', 'abilities'],
+        patterns: ['what can you do', 'help', 'capabilities', 'features', 'abilities', 'what are you'],
         response: `🧠 **My Capabilities:**
 
 • **Intelligence**: Natural language understanding with context awareness
@@ -37,7 +37,7 @@ Ask me anything and I'll provide detailed, helpful responses!`,
         confidence: 98
       },
       code: {
-        patterns: ['code', 'programming', 'debug', 'python', 'javascript', 'react'],
+        patterns: ['code', 'programming', 'debug', 'python', 'javascript', 'react', 'developer', 'coding'],
         response: `💻 I can help with programming! I understand:
 
 • Python, JavaScript, React, and many other languages
@@ -48,6 +48,11 @@ Ask me anything and I'll provide detailed, helpful responses!`,
 
 Share your code or describe what you need help with!`,
         confidence: 90
+      },
+      thanks: {
+        patterns: ['thank', 'thanks', 'appreciate'],
+        response: `You're welcome! I'm happy to help. Feel free to ask if you have more questions! 😊`,
+        confidence: 95
       }
     };
   }
@@ -109,9 +114,14 @@ export default function AIBrainChat({ isOpen, onClose }) {
         const result = await aiRef.current.think(currentInput);
         response = result.text;
       } else if (selectedAI === 'gpt') {
-        const res = await fetch(`https://zellapi.autos/ai/chatbot?text=${encodeURIComponent(currentInput)}`);
-        const data = await res.json();
-        response = data.result || data.message || 'No response received';
+        try {
+          const res = await fetch(`https://zellapi.autos/ai/chatbot?text=${encodeURIComponent(currentInput)}`);
+          const data = await res.json();
+          response = data.result || data.message || 'No response received';
+        } catch (apiError) {
+          console.error('GPT API error:', apiError);
+          response = '⚠️ GPT API is currently unavailable. Please try NOVA or Gemini instead.';
+        }
       } else if (selectedAI === 'gemini') {
         const apis = [
           `https://vapis.my.id/api/gemini?q=${encodeURIComponent(currentInput)}`,
@@ -119,20 +129,25 @@ export default function AIBrainChat({ isOpen, onClose }) {
           `https://api.ryzendesu.vip/api/ai/gemini?text=${encodeURIComponent(currentInput)}`
         ];
 
+        let apiWorked = false;
         for (const api of apis) {
           try {
             const res = await fetch(api);
             const data = await res.json();
             if (data.message || data.data || data.answer || data.result) {
               response = data.message || data.data || data.answer || data.result;
+              apiWorked = true;
               break;
             }
           } catch (e) {
+            console.log(`API ${api} failed, trying next...`);
             continue;
           }
         }
         
-        if (!response) throw new Error('All APIs failed');
+        if (!apiWorked) {
+          response = '⚠️ All Gemini APIs are currently unavailable. Please try NOVA instead.';
+        }
       }
 
       const aiMessage = { 
@@ -146,7 +161,7 @@ export default function AIBrainChat({ isOpen, onClose }) {
       console.error('AI Error:', error);
       setMessages(prev => [...prev, { 
         role: 'error', 
-        content: '⚠️ Failed to get response. Please try again.', 
+        content: '⚠️ Failed to get response. Please try again or switch to a different AI model.', 
         timestamp: Date.now() 
       }]);
     } finally {
@@ -155,20 +170,23 @@ export default function AIBrainChat({ isOpen, onClose }) {
   };
 
   const clearChat = () => {
-    setMessages([]);
+    if (window.confirm('Are you sure you want to clear all messages?')) {
+      setMessages([]);
+    }
   };
 
   const exportChat = () => {
     const chatData = {
       messages,
       exportedAt: new Date().toISOString(),
-      aiModel: selectedAI
+      aiModel: selectedAI,
+      totalMessages: messages.length
     };
     const blob = new Blob([JSON.stringify(chatData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ai-chat-${Date.now()}.json`;
+    a.download = `nekonet-ai-chat-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -178,6 +196,7 @@ export default function AIBrainChat({ isOpen, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-black border border-white/20 rounded-2xl w-full max-w-4xl h-[80vh] max-h-[700px] flex flex-col shadow-2xl">
+        {/* Header */}
         <div className="border-b border-white/10 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
@@ -193,7 +212,7 @@ export default function AIBrainChat({ isOpen, onClose }) {
             <button 
               onClick={exportChat}
               disabled={messages.length === 0}
-              className="p-2 hover:bg-white/10 rounded-lg transition disabled:opacity-30"
+              className="p-2 hover:bg-white/10 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
               title="Export chat"
             >
               <Download size={18} className="text-white" />
@@ -201,7 +220,7 @@ export default function AIBrainChat({ isOpen, onClose }) {
             <button 
               onClick={clearChat}
               disabled={messages.length === 0}
-              className="p-2 hover:bg-white/10 rounded-lg transition disabled:opacity-30"
+              className="p-2 hover:bg-white/10 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
               title="Clear chat"
             >
               <Trash2 size={18} className="text-white" />
@@ -209,12 +228,14 @@ export default function AIBrainChat({ isOpen, onClose }) {
             <button 
               onClick={onClose}
               className="p-2 hover:bg-white/10 rounded-lg transition"
+              title="Close"
             >
               <X size={20} className="text-white" />
             </button>
           </div>
         </div>
 
+        {/* AI Model Selector */}
         <div className="border-b border-white/10 p-3 flex gap-2 overflow-x-auto">
           <button
             onClick={() => setSelectedAI('nova')}
@@ -249,6 +270,7 @@ export default function AIBrainChat({ isOpen, onClose }) {
           </button>
         </div>
 
+        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center text-white/40 py-12">
@@ -263,6 +285,7 @@ export default function AIBrainChat({ isOpen, onClose }) {
                   <p>• "What can you do?"</p>
                   <p>• "Explain quantum computing"</p>
                   <p>• "Help me debug Python code"</p>
+                  <p>• "What is cybersecurity?"</p>
                 </div>
               </div>
             </div>
@@ -324,6 +347,7 @@ export default function AIBrainChat({ isOpen, onClose }) {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Input */}
         <div className="border-t border-white/10 p-4">
           <div className="flex gap-2">
             <input
